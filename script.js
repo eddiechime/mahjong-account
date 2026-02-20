@@ -3,86 +3,129 @@ const SB_KEY = 'sb_publishable_51l5etLAilmVdkptxlx-Wg_BbwqUrhA';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 
 let currentRoom = "";
-let myName = "";
+let myName = localStorage.getItem('mahjong_name') || "";
+let currentPlayers = [];
 
-// 创建新局：生成4位随机数
+// 头像库 (100个)
+const allAvatars = ['👾','🕹️','📟','💿','🌈','🛹','🥤','🍕','🍟','🍔','🐱','🐶','🦊','🦁','🐯','🐼','🐻','🐨','🐰','🐸','👻','💀','👽','🤖','🎃','🦾','🧠','🧶','👓','🎩','🎭','🎨','🎬','🎤','🎧','🎸','🎹','🥁','🎷','🎺','🎳','🎮','🎯','🎲','🎰','🎱','🧩','🧸','🧧','💰','💎','🔮','🧿','🏮','🎴','🧪','🧬','🔭','🛸','🚀','🛰️','🪐','🌌','🌋','🍀','🍄','🌵','🌴','🐉','🐲','🦖','🐢','🐍','🐙','🦑','🦞','🦐','🐚','🍣','🍜','🥟','🍱','🍵','🍺','🍷','🍹','🍦','🍩','🍭','🍓','🥑','🥦','🌶️','🌽',' popcorn','🍡','🥞','🥨'];
+
+// 1. 进房流程
 window.startNewRoom = function() {
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
-    document.getElementById('roomInput').value = code;
-    window.joinRoom();
+    currentRoom = Math.floor(1000 + Math.random() * 9000).toString();
+    checkName();
 };
 
-window.joinRoom = async function() {
-    const room = document.getElementById('roomInput').value.trim();
-    const user = document.getElementById('userInput').value.trim();
-    if (!room || !user) return alert("名字和房号都要有！");
+window.joinExistingRoom = function() {
+    const val = document.getElementById('roomInput').value.trim();
+    if (val.length !== 4) return alert("请输入4位房号");
+    currentRoom = val;
+    checkName();
+};
 
-    currentRoom = room;
-    myName = user;
+function checkName() {
+    if (!myName) document.getElementById('nameModal').classList.remove('hidden');
+    else enterBattle();
+}
 
+window.saveNameAndStart = function() {
+    const val = document.getElementById('userInput').value.trim();
+    if (!val) return alert("请赐名");
+    myName = val;
+    localStorage.setItem('mahjong_name', val);
+    document.getElementById('nameModal').classList.add('hidden');
+    enterBattle();
+};
+
+// 2. 数据库接入
+async function enterBattle() {
     try {
         let { data } = await sb.from('scores').select('*').eq('text', currentRoom).maybeSingle();
-        let players = data ? data.player_data : [{name: myName, score: 0, avatar: '🀄️'}];
-        
-        if (data && !players.find(p => p.name === myName)) {
-            players.push({name: myName, score: 0, avatar: '🀄️'});
-            await sb.from('scores').update({player_data: players}).eq('text', currentRoom);
-        } else if (!data) {
-            await sb.from('scores').insert([{text: currentRoom, player_data: players, history_data: []}]);
+        let players = data ? data.player_data : [];
+        let history = data ? data.history_data : [];
+
+        if (!players.find(p => p.name === myName)) {
+            players.push({ name: myName, score: 0, avatar: '🀄️' });
+            await sb.from('scores').upsert([{ text: currentRoom, player_data: players, history_data: history }]);
         }
 
-        // 成功进入：隐藏遮罩，显示主界面
         document.getElementById('loginOverlay').classList.add('hidden');
         document.getElementById('appMain').classList.remove('hidden');
-        document.getElementById('roomCodeDisplay').innerText = "房间号: " + currentRoom;
-        
+        document.getElementById('roomCodeDisplay').innerText = "房号: " + currentRoom;
+
         // 生成二维码
         document.getElementById('qrcode').innerHTML = "";
         new QRCode(document.getElementById("qrcode"), {
-            text: window.location.href.split('?')[0] + "?room=" + currentRoom,
-            width: 180, height: 180
+            text: window.location.origin + window.location.pathname + "?room=" + currentRoom,
+            width: 140, height: 140
         });
 
-        renderUI(players, data ? data.history_data : []);
-        subscribeUpdates();
-    } catch (e) { alert("进入失败: " + e.message); }
-};
+        renderUI(players, history);
+        
+        // 实时同步
+        sb.channel('any').on('postgres_changes', 
+            { event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` }, 
+            payload => renderUI(payload.new.player_data, payload.new.history_data)
+        ).subscribe();
+
+    } catch (e) { alert("进场失败: " + e.message); }
+}
 
 function renderUI(players, history) {
-    // 渲染逻辑...
-    const count = players.length;
-    document.getElementById('userCount').innerText = count;
+    currentPlayers = players;
+    document.getElementById('userCount').innerText = players.length;
+    document.getElementById('roomInfoContainer').className = (players.length >= 4) ? "room-info-edge" : "room-info-center";
 
-    // 满4人自动移到边缘
-    const infoBox = document.getElementById('roomInfoContainer');
-    if (count >= 4) {
-        infoBox.className = "room-info-edge";
-    } else {
-        infoBox.className = "room-info-center";
-    }
-    
-    // (接之前的卡片渲染代码...)
     const grid = document.getElementById('playerGrid');
     grid.innerHTML = players.map(p => `
         <div class="player-card ${p.name === myName ? 'me' : ''}">
-            <div class="card-top">
-                <div class="avatar-circle" onclick="window.changeAvatar('${p.name}')">${p.avatar || '👤'}</div>
-                <div class="info" onclick="window.togglePayBox('${p.name}')">
-                    <div class="p-name">${p.name}</div>
+            <div style="display:flex; align-items:center" onclick="window.toggleBox('${p.name}')">
+                <div class="avatar-circle" onclick="event.stopPropagation(); window.changeAvatar('${p.name}')">${p.avatar || '👤'}</div>
+                <div style="flex:1">
+                    <div style="font-size:14px; opacity:0.6">${p.name}</div>
                     <div class="p-score">${p.score}</div>
                 </div>
             </div>
-            <div class="transfer-area" id="box-${p.name}" style="display:none">
+            <div class="transfer-area" id="box-${p.name}">
                 <input type="number" id="in-${p.name}" placeholder="金额" inputmode="numeric">
-                <button onclick="window.quickPay('${p.name}')">确定</button>
+                <button class="btn-primary" style="padding:10px; margin:0" onclick="window.quickPay('${p.name}')">确定</button>
             </div>
         </div>
     `).join('');
+
+    document.getElementById('logList').innerHTML = (history || []).slice().reverse().map(h => `
+        <div style="padding:5px; font-size:12px; border-bottom:1px solid #333">${h.time} | ${h.from} ➔ ${h.to} [${h.pts}]</div>
+    `).join('');
 }
 
-function subscribeUpdates() {
-    sb.channel('updates').on('postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` }, 
-        payload => renderUI(payload.new.player_data, payload.new.history_data)
-    ).subscribe();
-}
+window.toggleBox = function(name) {
+    if (name === myName) return;
+    const box = document.getElementById(`box-${name}`);
+    const isShow = box.style.display === 'flex';
+    document.querySelectorAll('.transfer-area').forEach(b => b.style.display = 'none');
+    box.style.display = isShow ? 'none' : 'flex';
+};
+
+window.quickPay = async function(target) {
+    const pts = parseInt(document.getElementById(`in-${target}`).value);
+    if (!pts || pts <= 0) return;
+
+    let { data } = await sb.from('scores').select('*').eq('text', currentRoom).single();
+    let players = data.player_data.map(p => {
+        if (p.name === myName) p.score -= pts;
+        if (p.name === target) p.score += pts;
+        return p;
+    });
+    let history = data.history_data || [];
+    history.push({ from: myName, to: target, pts: pts, time: new Date().toLocaleTimeString('zh-CN', {hour12:false, minute:'2-digit'}) });
+
+    await sb.from('scores').update({ player_data: players, history_data: history }).eq('text', currentRoom);
+};
+
+window.changeAvatar = async function(name) {
+    if (name !== myName) return;
+    const next = allAvatars[Math.floor(Math.random()*allAvatars.length)];
+    const ps = currentPlayers.map(p => { if(p.name===myName) p.avatar=next; return p; });
+    await sb.from('scores').update({ player_data: ps }).eq('text', currentRoom);
+};
+
+window.changeTheme = function(t) { document.getElementById('mainBody').className = t; };
