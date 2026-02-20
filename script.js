@@ -1,121 +1,131 @@
-// --- 1. 初始化 Supabase 连接 ---
 const SUPABASE_URL = 'https://iksfgmnvbyldhrrptiwv.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_51l5etLAilmVdkptxlx-Wg_BbwqUrhA';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const ROOM_ID = '888888'; // 默认频道号
-let myName = localStorage.getItem('myName') || prompt("请输入你的昵称 (如：思聪)", "思聪");
-if (!localStorage.getItem('myName')) localStorage.setItem('myName', myName);
+let currentRoom = "";
+let myName = "";
+let currentData = { players: [], history: [] };
 
-let currentPlayers = [];
-let currentHistory = [];
+// 1. 加入房间逻辑
+async function joinRoom() {
+    const room = document.getElementById('roomInput').value.trim();
+    const user = document.getElementById('userInput').value.trim();
+    if (!room || !user) return alert("请填完整信息");
 
-// --- 2. 核心：联机监听 (Realtime) ---
-supabase.channel('public:scores')
-  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'scores', filter: `room_id=eq.${ROOM_ID}` }, (payload) => {
-    console.log('数据实时更新中...');
-    refreshUI(payload.new.player_data, payload.new.history_data);
-  })
-  .subscribe();
+    currentRoom = room;
+    myName = user;
+    localStorage.setItem('saved_name', user); // 保存名字
 
-// --- 3. 初始化读取数据 ---
-async function init() {
-    let { data, error } = await supabase.from('scores').select('*').eq('room_id', ROOM_ID).maybeSingle();
+    // 隐藏登录层
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('roomIdDisplay').innerText = currentRoom;
+
+    // 初始化并开启监听
+    await fetchRoomData();
+    subscribeRoom();
+}
+
+// 2. 实时监听 (Realtime)
+function subscribeRoom() {
+    supabase.channel('room_updates')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'scores', filter: `room_id=eq.${currentRoom}` }, 
+        payload => {
+            renderUI(payload.new.player_data, payload.new.history_data);
+        }).subscribe();
+}
+
+// 3. 获取/创建房间数据
+async function fetchRoomData() {
+    let { data } = await supabase.from('scores').select('*').eq('room_id', currentRoom).maybeSingle();
     
     if (!data) {
-        // 如果房间不存在，自动初始化第一局
-        const startPlayers = [{name:'思聪', score:0}, {name:'Lynn', score:0}, {name:'亲戚A', score:0}, {name:'亲戚B', score:0}];
-        await supabase.from('scores').insert([{room_id: ROOM_ID, player_data: startPlayers, history_data: []}]);
-        refreshUI(startPlayers, []);
+        // 创建新房间，初始只有你自己
+        const initPlayers = [{name: myName, score: 0, avatar: '👤'}];
+        await supabase.from('scores').insert([{room_id: currentRoom, player_data: initPlayers, history_data: []}]);
+        renderUI(initPlayers, []);
     } else {
-        refreshUI(data.player_data, data.history_data);
+        // 如果你在房间里不在，就把你加进去
+        let players = data.player_data;
+        if (!players.find(p => p.name === myName)) {
+            players.push({name: myName, score: 0, avatar: '👤'});
+            await supabase.from('scores').update({player_data: players}).eq('room_id', currentRoom);
+        }
+        renderUI(players, data.history_data);
     }
-    document.getElementById('roomIdDisplay').innerText = ROOM_ID;
 }
 
-// --- 4. 界面渲染逻辑 ---
-function refreshUI(players, history) {
-    currentPlayers = players;
-    currentHistory = history || [];
-    
-    // 渲染大字号玩家卡片
+// 4. 渲染 UI (界限分明，易读性好)
+function renderUI(players, history) {
+    currentData = { players, history };
     const grid = document.getElementById('playerGrid');
+    
     grid.innerHTML = players.map(p => `
-        <div class="player-card" onclick="openModal('${p.name}')">
-            <div class="avatar">${p.name[0]}</div>
-            <div class="p-name">${p.name}${p.name === myName ? '(我)' : ''}</div>
-            <div class="p-score ${p.score >= 0 ? 'plus' : 'minus'}">${p.score}</div>
+        <div class="player-card ${p.name === myName ? 'me' : ''}" onclick="openTransfer('${p.name}')">
+            <div class="avatar-circle">${p.avatar}</div>
+            <div class="info">
+                <span class="n">${p.name}</span>
+                <span class="s ${p.score >= 0 ? 'p' : 'm'}">${p.score}</span>
+            </div>
         </div>
     `).join('');
 
-    // 渲染流水记录
     const logList = document.getElementById('logList');
-    logList.innerHTML = currentHistory.slice().reverse().map(h => `
+    logList.innerHTML = (history || []).slice().reverse().map(h => `
         <div class="log-item">
-            <span class="t">${h.time}</span> 
-            <strong>${h.from}</strong> ▶ <strong>${h.to}</strong> 
-            <span class="v">${h.points}金币</span>
+            <span class="time">${h.time}</span>
+            <span class="msg"><b>${h.from}</b> 给 <b>${h.to}</b> 了 <b>${h.pts}</b></span>
         </div>
     `).join('');
 }
 
-let targetPlayer = '';
-function openModal(name) {
-    if (name === myName) return; // 不能给自己转账
-    targetPlayer = name;
-    document.getElementById('modalTitle').innerText = `向 ${name} 入账`;
+let target = "";
+function openTransfer(name) {
+    if (name === myName) return;
+    target = name;
+    document.getElementById('modalTitle').innerText = `向 ${name} 付钱`;
     document.getElementById('modal').classList.remove('hidden');
 }
 
 function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
-// --- 5. 确认转账并同步云端 ---
+// 5. 核心：防止平行时空的更新逻辑
 async function confirmPay() {
-    const input = document.getElementById('scoreInput');
-    const val = parseInt(input.value);
-    if (!val || val <= 0) return;
+    const pts = parseInt(document.getElementById('scoreInput').value);
+    if (!pts) return;
 
-    // 计算新分数
-    const nextPlayers = currentPlayers.map(p => {
-        let s = p.score;
-        if (p.name === myName) s -= val;
-        if (p.name === targetPlayer) s += val;
-        return { ...p, score: s };
+    // 重新获取最新数据防止覆盖他人操作
+    let { data } = await supabase.from('scores').select('*').eq('room_id', currentRoom).single();
+    let players = data.player_data;
+    let history = data.history_data || [];
+
+    // 计算分数
+    players = players.map(p => {
+        if (p.name === myName) p.score -= pts;
+        if (p.name === target) p.score += pts;
+        return p;
     });
 
     // 记录流水
-    const newLog = { 
-        from: myName, to: targetPlayer, points: val, 
-        time: new Date().toLocaleTimeString('zh-CN', {hour12:false, hour:'2-digit', minute:'2-digit'}) 
-    };
-    const nextHistory = [...currentHistory, newLog];
+    const log = { from: myName, to: target, pts: pts, time: new Date().toLocaleTimeString('zh-CN',{hour12:false, minute:'2-digit', second:'2-digit'}) };
+    history.push(log);
 
-    // 同步到 Supabase
     const { error } = await supabase.from('scores')
-        .update({ player_data: nextPlayers, history_data: nextHistory })
-        .eq('room_id', ROOM_ID);
+        .update({ player_data: players, history_data: history })
+        .eq('room_id', currentRoom);
 
     if (!error) {
-        input.value = '';
-        closeModal();
-        // 甄嬛传专属音效逻辑
+        // 甄嬛版配音
         if (document.body.className === 'theme-palace') {
-            const speak = new SpeechSynthesisUtterance(`赏赐${targetPlayer}碎银${val}两，收好了。`);
-            speak.lang = 'zh-CN';
-            window.speechSynthesis.speak(speak);
+            const msg = new SpeechSynthesisUtterance(`赏赐${target}碎银${pts}两`);
+            window.speechSynthesis.speak(msg);
         }
-    } else {
-        alert("同步失败，请检查网络");
+        closeModal();
     }
 }
 
-// 主题切换函数
-function changeTheme(theme) {
-    document.getElementById('mainBody').className = theme;
-    const slogan = document.getElementById('sloganText');
-    if (theme === 'theme-palace') slogan.innerText = "后宫生存不易，碎银也要算清";
-    else if (theme === 'theme-zen') slogan.innerText = "谈钱不伤感情，笑纳承让";
-    else slogan.innerText = "1块1局 · 亲戚明算账";
-}
+function changeTheme(t) { document.getElementById('mainBody').className = t; }
 
-init();
+// 自动填入上次的名字
+window.onload = () => {
+    if(localStorage.getItem('saved_name')) document.getElementById('userInput').value = localStorage.getItem('saved_name');
+}
