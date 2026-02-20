@@ -131,3 +131,30 @@ body { background: var(--bg); color: var(--text); }
 .theme-palace .player-card:active {
     animation: goldGlow 0.5s ease-in-out;
 }
+/* 玩家卡片设计 */
+.player-card {
+    display: flex; align-items: center; padding: 20px;
+    background: rgba(255,255,255,0.1); border-radius: 15px;
+    border: 2px solid var(--border); margin-bottom: 12px;
+    transition: all 0.3s;
+}
+.player-card.me { border-color: #ff00ff; box-shadow: 0 0 15px rgba(255,0,255,0.3); }
+
+.avatar-circle {
+    width: 70px; height: 70px; border-radius: 50%;
+    background: var(--border); font-size: 35px;
+    display: flex; align-items: center; justify-content: center;
+    margin-right: 20px; cursor: pointer;
+}
+
+.info { flex: 1; cursor: pointer; }
+.p-name { font-size: 18px; opacity: 0.8; }
+.p-score { font-size: 40px; font-weight: 900; font-family: 'Courier New', monospace; }
+.p-score.plus { color: #00ff00; }
+.p-score.minus { color: #ff0000; }
+
+/* 流水列表区隔 */
+.log-item {
+    padding: 10px; border-bottom: 1px dashed var(--border);
+    font-size: 14px; color: var(--text);
+}
