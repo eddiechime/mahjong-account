@@ -1,131 +1,143 @@
-// --- 1. 初始化配置 ---
+// --- 1. 唯一初始化 ---
 const SB_URL = 'https://iksfgmnvbyldhrrptiwv.supabase.co';
 const SB_KEY = 'sb_publishable_51l5etLAilmVdkptxlx-Wg_BbwqUrhA';
-const db = window.supabase.createClient(SB_URL, SB_KEY);
+const mahjongDb = window.supabase.createClient(SB_URL, SB_KEY);
 
 let currentRoom = "";
 let myName = localStorage.getItem('mahjong_name') || "";
 
-// --- 2. 挂载全局函数，解决按钮失效报错 ---
+// --- 2. 挂载全局函数 ---
+window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomFromUrl = urlParams.get('room');
+    if (roomFromUrl) {
+        currentRoom = roomFromUrl;
+        window.checkName();
+    }
+};
+
 window.startNewRoom = function() {
     currentRoom = Math.floor(1000 + Math.random() * 9000).toString();
     window.history.pushState({}, '', `?room=${currentRoom}`);
-    checkName();
+    window.checkName();
 };
 
 window.joinExistingRoom = function() {
-    currentRoom = document.getElementById('roomInput').value;
-    if (currentRoom.length !== 4) return alert("房号需4位");
+    const val = document.getElementById('roomInput').value;
+    if (val.length !== 4) return alert("房号需4位");
+    currentRoom = val;
     window.history.pushState({}, '', `?room=${currentRoom}`);
-    checkName();
+    window.checkName();
+};
+
+window.checkName = function() {
+    if (!myName) document.getElementById('nameModal').classList.remove('hidden');
+    else window.enterBattle();
 };
 
 window.saveNameAndStart = function() {
     const val = document.getElementById('userInput').value.trim();
-    if (!val) return;
+    if (!val) return alert("请输入名字");
     myName = val;
     localStorage.setItem('mahjong_name', val);
     document.getElementById('nameModal').classList.add('hidden');
-    enterBattle();
+    window.enterBattle();
 };
 
-function checkName() {
-    if (!myName) document.getElementById('nameModal').classList.remove('hidden');
-    else enterBattle();
-}
+// --- 3. 联机与无感更新 ---
+window.enterBattle = async function() {
+    try {
+        let { data, error } = await mahjongDb.from('scores').select('*').eq('text', currentRoom).maybeSingle();
+        if (error) throw error;
 
-// --- 3. 核心战场与无感实时监听 ---
-async function enterBattle() {
-    // A. 强制获取云端最新数据
-    let { data } = await db.from('scores').select('*').eq('text', currentRoom).maybeSingle();
-    let players = data ? (data.player_data || []) : [];
+        let players = data ? (data.player_data || []) : [];
+        let history = data ? (data.history_data || []) : [];
 
-    // B. 检查并自动加入
-    if (!players.find(p => p.name === myName)) {
-        players.push({ name: myName, score: 0, avatar: '🀄️' });
-        await db.from('scores').upsert({ text: currentRoom, player_data: players, history_data: data?.history_data || [] });
-    }
+        if (!players.find(p => p.name === myName)) {
+            players.push({ name: myName, score: 0, avatar: '🀄️' });
+            await mahjongDb.from('scores').upsert({ text: currentRoom, player_data: players, history_data: history });
+        }
 
-    document.getElementById('loginOverlay').classList.add('hidden');
-    document.getElementById('appMain').classList.remove('hidden');
-    document.getElementById('roomCodeDisplay').innerText = "房号: " + currentRoom;
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('appMain').classList.remove('hidden');
+        document.getElementById('roomCodeDisplay').innerText = "房号: " + currentRoom;
 
-    // 生成带参数的二维码，扫码即入
-    document.getElementById('qrcode').innerHTML = "";
-    new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 130, height: 130 });
+        document.getElementById('qrcode').innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 140, height: 140 });
 
-    renderUI(players, data?.history_data || []);
+        renderUI(players, history);
+        
+        // 实时订阅：解决 Lynn 那边不刷新的问题
+        mahjongDb.channel(`room-${currentRoom}`).on('postgres_changes', 
+            { event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` }, 
+            payload => { if(payload.new) renderUI(payload.new.player_data, payload.new.history_data); }
+        ).subscribe();
 
-    // 【核心】开启实时订阅：实现无感自动刷新
-    db.channel(`room-${currentRoom}`).on('postgres_changes', { 
-        event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` 
-    }, payload => {
-        console.log("云端同步成功！");
-        renderUI(payload.new.player_data, payload.new.history_data);
-    }).subscribe();
-}
+    } catch (e) { alert("进场失败，请确认已在后台运行 DISABLE RLS！"); }
+};
 
 function renderUI(players, history) {
     document.getElementById('userCount').innerText = players.length;
+    document.getElementById('roomInfoContainer').className = (players.length >= 4) ? "room-info-edge" : "room-info-center";
+
     const grid = document.getElementById('playerGrid');
     grid.innerHTML = players.map(p => `
         <div class="player-card ${p.name === myName ? 'me' : ''}">
-            <div class="card-main" onclick="window.toggleBox('${p.name}')">
-                <span class="p-avatar">${p.avatar || '👤'}</span>
-                <span class="p-name">${p.name}</span>
-                <span class="p-score">${p.score}</span>
+            <div style="display:flex; align-items:center; position:relative; z-index:2" onclick="window.toggleBox('${p.name}')">
+                <div style="width:60px; height:60px; background:#333; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; margin-right:15px;">
+                    ${p.avatar || '👤'}
+                </div>
+                <div style="flex:1">
+                    <div style="font-size:14px; opacity:0.6">${p.name}</div>
+                    <div class="p-score" style="font-size:38px; font-weight:900;">${p.score}</div>
+                </div>
             </div>
-            <div id="box-${p.name}" class="transfer-area" style="display:none; padding:15px; background:rgba(255,255,255,0.1);">
-                <input type="number" id="in-${p.name}" placeholder="金额" inputmode="numeric" style="width:100%; padding:10px; font-size:18px;">
-                <button onclick="window.doPay('${p.name}')" class="btn-primary" style="margin-top:10px; width:100%; padding:12px; font-weight:900;">确认转账</button>
+            <div class="transfer-area" id="box-${p.name}" style="display:none; flex-direction:column; gap:10px; margin-top:10px; padding:15px; background:rgba(255,255,255,0.1); border-radius:10px; position:relative; z-index:100;">
+                <input type="number" id="in-${p.name}" placeholder="金额" inputmode="numeric" style="width:100%; padding:12px; font-size:20px; border:none; border-radius:8px; background:#fff; color:#000;">
+                <button onclick="window.quickPay('${p.name}')" style="width:100%; padding:12px; background:#ffeb3b; color:#000; border:none; border-radius:8px; font-weight:900;">确认转账</button>
             </div>
         </div>
     `).join('');
 
     document.getElementById('logList').innerHTML = (history || []).slice().reverse().map(h => `
-        <div style="font-size:12px; padding:5px; border-bottom:1px solid #333; opacity:0.7">${h.from} ➔ ${h.to} [${h.pts}]</div>
+        <div style="padding:8px; font-size:12px; border-bottom:1px solid #444; color:#ccc">${h.time} | ${h.from} ➔ ${h.to} [${h.pts}]</div>
     `).join('');
 }
 
-window.toggleBox = (name) => {
+window.toggleBox = function(name) {
     if (name === myName) return;
-    const el = document.getElementById(`box-${name}`);
-    const isShow = el.style.display === 'block';
+    const box = document.getElementById(`box-${name}`);
+    const isShow = box.style.display === 'flex';
     document.querySelectorAll('.transfer-area').forEach(b => b.style.display = 'none');
-    el.style.display = isShow ? 'none' : 'block';
+    box.style.display = isShow ? 'none' : 'flex';
 };
 
-// --- 4. 【终极绝杀】原子化结算逻辑，终结平行时空 ---
-window.doPay = async (target) => {
+// --- 4. 绝杀：先读后写，解决平行时空 ---
+window.quickPay = async function(target) {
     const inputEl = document.getElementById(`in-${target}`);
-    const val = parseInt(inputEl.value);
-    if (!val || val <= 0) return;
+    const pts = parseInt(inputEl.value);
+    if (!pts || pts <= 0) return;
 
-    // A. 转账瞬间强制去云端抓取 Lynn 等人的最新分
-    let { data, error } = await db.from('scores').select('*').eq('text', currentRoom).single();
-    if (error) return alert("同步失败，请检查网络");
+    try {
+        // A. 转账瞬间强行抓取云端最新数据
+        let { data, error } = await mahjongDb.from('scores').select('*').eq('text', currentRoom).single();
+        if (error) throw error;
 
-    let latestPlayers = data.player_data;
-    let latestHistory = data.history_data || [];
+        let players = data.player_data.map(p => {
+            if (p.name === myName) p.score -= pts;
+            if (p.name === target) p.score += pts;
+            return p;
+        });
+        let history = data.history_data || [];
+        history.push({ from: myName, to: target, pts: pts, time: new Date().toLocaleTimeString('zh-CN', {hour12:false, minute:'2-digit'}) });
 
-    // B. 在云端最新版本的基础上进行运算
-    latestPlayers = latestPlayers.map(p => {
-        if (p.name === myName) p.score -= val;
-        if (p.name === target) p.score += val;
-        return p;
-    });
-    
-    latestHistory.push({ from: myName, to: target, pts: val, time: new Date().toLocaleTimeString('zh-CN', {hour12:false, minute:'2-digit'}) });
+        // B. 写回数据库，触发所有人的实时刷新
+        const { error: updateError } = await mahjongDb.from('scores').update({ player_data: players, history_data: history }).eq('text', currentRoom);
+        if (updateError) throw updateError;
 
-    // C. 提交合并后的数据，实时频道会自动通知所有人刷新
-    const { error: updateError } = await db.from('scores').update({ player_data: latestPlayers, history_data: latestHistory }).eq('text', currentRoom);
-    
-    if (!updateError) {
         inputEl.value = "";
         document.getElementById(`box-${target}`).style.display = 'none';
+    } catch (e) {
+        alert("操作失败，请确认 Supabase 权限已放行！");
     }
 };
-
-// 自动重连逻辑
-const urlRoom = new URLSearchParams(window.location.search).get('room');
-if (urlRoom) { currentRoom = urlRoom; checkName(); }
