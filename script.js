@@ -6,10 +6,8 @@ let currentRoom = "";
 let myName = localStorage.getItem('mahjong_name') || "";
 let currentPlayers = [];
 
-// 头像库 (100个)
-const allAvatars = ['👾','🕹️','📟','💿','🌈','🛹','🥤','🍕','🍟','🍔','🐱','🐶','🦊','🦁','🐯','🐼','🐻','🐨','🐰','🐸','👻','💀','👽','🤖','🎃','🦾','🧠','🧶','👓','🎩','🎭','🎨','🎬','🎤','🎧','🎸','🎹','🥁','🎷','🎺','🎳','🎮','🎯','🎲','🎰','🎱','🧩','🧸','🧧','💰','💎','🔮','🧿','🏮','🎴','🧪','🧬','🔭','🛸','🚀','🛰️','🪐','🌌','🌋','🍀','🍄','🌵','🌴','🐉','🐲','🦖','🐢','🐍','🐙','🦑','🦞','🦐','🐚','🍣','🍜','🥟','🍱','🍵','🍺','🍷','🍹','🍦','🍩','🍭','🍓','🥑','🥦','🌶️','🌽',' popcorn','🍡','🥞','🥨'];
+const allAvatars = ['👾','🕹️','📟','💿','🌈','🛹','🥤','🍕','🍟','🍔','🐱','🐶','🦊','🦁','🐯','🐼','🐻','🐨','🐰','🐸','👻','💀','👽','🤖','🎃','🦾','🧠','👓','🎩','🎭','🎨','🎬','🎤','🎧','🎸','🎹','🥁','🎷','🎺','🎳','🎮','🎯','🎲','🎰','🎱','🧩','🧸','🧧','💰','💎','🔮','🧿','🏮','🎴','🧪','🧬','🔭','🛸','🚀','🛰️','🪐','🌌','🌋','🍀','🍄','🌵','🌴','🐉','🐲','Rex','🦖','🐢','🐍','🐙','🦑','🦞','🦐','🐚','🍣','🍜','🥟','🍱','🍵','🍺','🍷','🍹','🍦','🍩','🍭','🍓','🥑','🥦','🌶️','🌽','🍿','🍡','🥞','🥨'];
 
-// 1. 进房流程
 window.startNewRoom = function() {
     currentRoom = Math.floor(1000 + Math.random() * 9000).toString();
     checkName();
@@ -36,23 +34,24 @@ window.saveNameAndStart = function() {
     enterBattle();
 };
 
-// 2. 数据库接入
 async function enterBattle() {
     try {
-        let { data } = await sb.from('scores').select('*').eq('text', currentRoom).maybeSingle();
-        let players = data ? data.player_data : [];
-        let history = data ? data.history_data : [];
+        let { data, error } = await sb.from('scores').select('*').eq('text', currentRoom).maybeSingle();
+        
+        // 核心修复：如果 data 为空，手动初始化一个空对象
+        let players = data ? (data.player_data || []) : [];
+        let history = data ? (data.history_data || []) : [];
 
         if (!players.find(p => p.name === myName)) {
             players.push({ name: myName, score: 0, avatar: '🀄️' });
-            await sb.from('scores').upsert([{ text: currentRoom, player_data: players, history_data: history }]);
+            // 使用 upsert 确保新房间创建成功
+            await sb.from('scores').upsert({ text: currentRoom, player_data: players, history_data: history });
         }
 
         document.getElementById('loginOverlay').classList.add('hidden');
         document.getElementById('appMain').classList.remove('hidden');
         document.getElementById('roomCodeDisplay').innerText = "房号: " + currentRoom;
 
-        // 生成二维码
         document.getElementById('qrcode').innerHTML = "";
         new QRCode(document.getElementById("qrcode"), {
             text: window.location.origin + window.location.pathname + "?room=" + currentRoom,
@@ -61,16 +60,18 @@ async function enterBattle() {
 
         renderUI(players, history);
         
-        // 实时同步
-        sb.channel('any').on('postgres_changes', 
+        sb.channel('updates').on('postgres_changes', 
             { event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` }, 
-            payload => renderUI(payload.new.player_data, payload.new.history_data)
+            payload => {
+                if(payload.new) renderUI(payload.new.player_data, payload.new.history_data);
+            }
         ).subscribe();
 
     } catch (e) { alert("进场失败: " + e.message); }
 }
 
 function renderUI(players, history) {
+    if(!players) return; // 二重防护
     currentPlayers = players;
     document.getElementById('userCount').innerText = players.length;
     document.getElementById('roomInfoContainer').className = (players.length >= 4) ? "room-info-edge" : "room-info-center";
@@ -85,15 +86,17 @@ function renderUI(players, history) {
                     <div class="p-score">${p.score}</div>
                 </div>
             </div>
-            <div class="transfer-area" id="box-${p.name}">
-                <input type="number" id="in-${p.name}" placeholder="金额" inputmode="numeric">
-                <button class="btn-primary" style="padding:10px; margin:0" onclick="window.quickPay('${p.name}')">确定</button>
+            <div class="transfer-area" id="box-${p.name}" style="display:none">
+                <input type="number" class="quick-input" id="in-${p.name}" placeholder="输入积分..." inputmode="numeric">
+                <button class="quick-send-btn" onclick="window.quickPay('${p.name}')">转账</button>
             </div>
         </div>
     `).join('');
 
     document.getElementById('logList').innerHTML = (history || []).slice().reverse().map(h => `
-        <div style="padding:5px; font-size:12px; border-bottom:1px solid #333">${h.time} | ${h.from} ➔ ${h.to} [${h.pts}]</div>
+        <div style="padding:8px; font-size:13px; border-bottom:1px solid #333; color:#ccc">
+            <span style="color:var(--gold)">${h.time}</span> | ${h.from} ➔ ${h.to} [<b>${h.pts}</b>]
+        </div>
     `).join('');
 }
 
@@ -103,10 +106,12 @@ window.toggleBox = function(name) {
     const isShow = box.style.display === 'flex';
     document.querySelectorAll('.transfer-area').forEach(b => b.style.display = 'none');
     box.style.display = isShow ? 'none' : 'flex';
+    if(!isShow) setTimeout(() => document.getElementById(`in-${name}`).focus(), 100);
 };
 
 window.quickPay = async function(target) {
-    const pts = parseInt(document.getElementById(`in-${target}`).value);
+    const inputEl = document.getElementById(`in-${target}`);
+    const pts = parseInt(inputEl.value);
     if (!pts || pts <= 0) return;
 
     let { data } = await sb.from('scores').select('*').eq('text', currentRoom).single();
@@ -119,6 +124,7 @@ window.quickPay = async function(target) {
     history.push({ from: myName, to: target, pts: pts, time: new Date().toLocaleTimeString('zh-CN', {hour12:false, minute:'2-digit'}) });
 
     await sb.from('scores').update({ player_data: players, history_data: history }).eq('text', currentRoom);
+    inputEl.value = "";
 };
 
 window.changeAvatar = async function(name) {
@@ -127,5 +133,3 @@ window.changeAvatar = async function(name) {
     const ps = currentPlayers.map(p => { if(p.name===myName) p.avatar=next; return p; });
     await sb.from('scores').update({ player_data: ps }).eq('text', currentRoom);
 };
-
-window.changeTheme = function(t) { document.getElementById('mainBody').className = t; };
