@@ -8,22 +8,27 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body id="mainBody">
     <div id="loginOverlay" class="full-screen-mask">
         <div class="glass-box">
-            <h2>🀄️ 孝南麻将云账本</h2>
-            <button onclick="startNewRoom()" class="btn-primary">开启新局</button>
-            <input type="number" id="roomInput" placeholder="4位房号" style="margin-top:10px; width:80%">
-            <button onclick="joinExistingRoom()" class="btn-side">加入</button>
+            <h2 class="cyber-title">🀄️ 孝南麻将云账本</h2>
+            <button onclick="window.startNewRoom()" class="btn-primary">开启新局</button>
+            <div class="divider">或</div>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="roomInput" placeholder="4位房号" pattern="[0-9]*" style="flex:1">
+                <button onclick="window.joinExistingRoom()" class="btn-side">加入</button>
+            </div>
         </div>
     </div>
+
     <div id="nameModal" class="full-screen-mask hidden">
         <div class="glass-box">
             <h3>阁下大名？</h3>
-            <input type="text" id="userInput" placeholder="输入名字">
-            <button onclick="saveNameAndStart()" class="btn-primary">进入</button>
+            <input type="text" id="userInput" placeholder="输入名字 (如: 思聪)">
+            <button onclick="window.saveNameAndStart()" class="btn-primary">步入战场</button>
         </div>
     </div>
+
     <div id="appMain" class="app-container hidden">
         <div id="roomInfoContainer" class="room-info-center">
             <div id="roomCodeDisplay" class="big-code"></div>
@@ -31,7 +36,9 @@
             <p>已加入: <span id="userCount">0</span>/4</p>
         </div>
         <div id="playerGrid" class="player-grid"></div>
-        <div id="logList" class="log-section"></div>
+        <div class="log-section">
+            <div id="logList"></div>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>
