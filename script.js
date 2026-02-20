@@ -140,3 +140,95 @@ function subscribeUpdates() {
 }
 
 window.changeTheme = function(t) { document.getElementById('mainBody').className = t; }
+// --- 核心变量保持不变 ---
+const SUPABASE_URL = 'https://iksfgmnvbyldhrrptiwv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_51l5etLAilmVdkptxlx-Wg_BbwqUrhA';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 渲染 UI：加入内嵌输入框
+function renderUI(players, history) {
+    currentPlayers = players;
+    currentHistory = history || [];
+    
+    const grid = document.getElementById('playerGrid');
+    grid.innerHTML = players.map(p => `
+        <div class="player-card ${p.name === myName ? 'me' : ''}" id="card-${p.name}">
+            <div style="display:flex; align-items:center; width:100%">
+                <div class="avatar-circle" onclick="handleAvatarClick('${p.name}')">${p.avatar || '👤'}</div>
+                <div class="info">
+                    <div class="p-name">${p.name}</div>
+                    <div class="p-score ${p.score >= 0 ? 'plus' : 'minus'}">${p.score}</div>
+                </div>
+            </div>
+            <div class="transfer-area" id="box-${p.name}">
+                <input type="number" class="quick-input" id="in-${p.name}" placeholder="输入金额..." 
+                       onkeypress="if(event.keyCode==13) window.quickPay('${p.name}')">
+                <button class="quick-send-btn" onclick="window.quickPay('${p.name}')">转账</button>
+            </div>
+        </div>
+    `).join('');
+
+    // 更新流水记录
+    const logList = document.getElementById('logList');
+    logList.innerHTML = currentHistory.slice().reverse().map(h => `
+        <div class="log-item"><b>${h.from}</b> ▶ <b>${h.to}</b> [${h.pts}两]</div>
+    `).join('');
+}
+
+// 处理点击逻辑：分清换头像和转账
+window.handleAvatarClick = function(name) {
+    if (name === myName) {
+        // 点击自己：换头像
+        window.changeAvatar(name);
+    } else {
+        // 点击别人：展开/折叠输入框
+        const allBoxes = document.querySelectorAll('.transfer-area');
+        allBoxes.forEach(b => b.classList.remove('active'));
+        document.getElementById(`box-${name}`).classList.add('active');
+        document.getElementById(`in-${name}`).focus();
+    }
+}
+
+// 无感快传逻辑
+window.quickPay = async function(targetName) {
+    const input = document.getElementById(`in-${targetName}`);
+    const pts = parseInt(input.value);
+    if (!pts || pts <= 0) return;
+
+    // 1. 获取最新数据防止冲突
+    let { data } = await supabaseClient.from('scores').select('*').eq('text', currentRoom).single();
+    let players = data.player_data;
+    let history = data.history_data || [];
+
+    // 2. 更新数值
+    players = players.map(p => {
+        if (p.name === myName) p.score -= pts;
+        if (p.name === targetName) p.score += pts;
+        return p;
+    });
+
+    // 3. 记录流水
+    history.push({ from: myName, to: targetName, pts: pts, 
+        time: new Date().toLocaleTimeString('zh-CN', {hour12:false, minute:'2-digit'}) 
+    });
+
+    // 4. 同步云端
+    const { error } = await supabaseClient.from('scores').update({player_data: players, history_data: history}).eq('text', currentRoom);
+    
+    if (!error) {
+        // 甄嬛传音效
+        if (document.body.className === 'theme-palace') {
+            const speak = new SpeechSynthesisUtterance(`赏赐${targetName}碎银${pts}两`);
+            window.speechSynthesis.speak(speak);
+        }
+        input.value = '';
+        document.getElementById(`box-${targetName}`).classList.remove('active');
+    }
+}
+
+// 登录按钮文字适配
+window.changeTheme = function(t) { 
+    document.getElementById('mainBody').className = t; 
+    const btn = document.querySelector('.login-box button');
+    btn.innerText = (t === 'theme-palace') ? "开启宫斗" : "接入矩阵";
+}
