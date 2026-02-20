@@ -158,3 +158,38 @@ body { background: var(--bg); color: var(--text); }
     padding: 10px; border-bottom: 1px dashed var(--border);
     font-size: 14px; color: var(--text);
 }
+/* --- 进入战场按钮特效 --- */
+.login-box button {
+    position: relative; overflow: hidden;
+    padding: 15px 30px; font-size: 22px; cursor: pointer;
+    background: var(--text); color: var(--bg); border: none;
+    transition: 0.3s; z-index: 1;
+}
+/* Y2K 风格下的按钮闪烁 */
+.theme-y2k .login-box button::before {
+    content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.8), transparent);
+    transform: rotate(45deg); animation: btnScan 3s infinite; z-index: -1;
+}
+@keyframes btnScan { 0% { left: -100%; } 100% { left: 100%; } }
+
+/* --- 无感输入框：内嵌在卡片中 --- */
+.transfer-area {
+    max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out;
+    display: flex; gap: 5px; margin-top: 10px; border-top: 1px dashed var(--border);
+    padding-top: 0;
+}
+.transfer-area.active { max-height: 100px; padding-top: 10px; }
+
+.quick-input {
+    flex: 1; background: transparent; border: 1px solid var(--border);
+    color: var(--text); padding: 8px; font-size: 18px; outline: none;
+}
+.quick-send-btn {
+    background: var(--text); color: var(--bg); border: none;
+    padding: 8px 15px; font-weight: bold; cursor: pointer;
+}
+
+/* 分区界限强化 */
+.player-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
+.player-card { border-left: 8px solid var(--border); background: rgba(0,0,0,0.05); }
