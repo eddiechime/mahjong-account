@@ -1,6 +1,26 @@
-/* 登录遮罩层背景 */
-.login-mask { background: #1a1a1a; color: #fff; }
+/* 强制全屏遮罩：解决没遮住的问题 */
+.login-mask {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: #1a1a1a; z-index: 10000; display: flex; justify-content: center; align-items: center;
+}
+.hidden { display: none !important; }
 
+/* 二维码居中样式 */
+.room-info-center {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 40px 0; transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#qrcode { background: #fff; padding: 10px; border-radius: 8px; }
+.big-code { font-size: 48px; font-weight: 900; color: #ffeb3b; margin-bottom: 10px; }
+
+/* 满4人后的边缘位置 */
+.room-info-edge {
+    flex-direction: row; justify-content: space-between; padding: 10px 20px;
+    background: rgba(0,0,0,0.5); border-bottom: 1px solid #444;
+}
+.room-info-edge #qrcode { transform: scale(0.4); transform-origin: right; margin: 0; }
+.room-info-edge .big-code { font-size: 20px; margin: 0; }
+.room-info-edge #waitMsg { display: none; }
 /* 按钮：高对比度黄底黑字，极其易读 */
 .login-box button {
     background: #ffeb3b; color: #000;
