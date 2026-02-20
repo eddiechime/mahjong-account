@@ -2,70 +2,18 @@
     --cyber-bg: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
     --gold: #ffeb3b;
 }
-
-body {
-    background: var(--cyber-bg);
-    color: #fff;
-    margin: 0;
-    font-family: -apple-system, sans-serif;
-    min-height: 100vh;
-}
-
-/* 全屏强力遮罩 */
-.full-screen-mask {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: var(--cyber-bg); z-index: 10000;
-    display: flex; justify-content: center; align-items: center;
-}
-
-.glass-box {
-    width: 85%; max-width: 400px; padding: 30px; text-align: center;
-    background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px);
-    border: 2px solid var(--gold); border-radius: 20px;
-}
-
+body { background: var(--cyber-bg); color: #fff; margin: 0; font-family: sans-serif; min-height: 100vh; }
+.full-screen-mask { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--cyber-bg); z-index: 10000; display: flex; justify-content: center; align-items: center; }
+.glass-box { width: 85%; max-width: 400px; padding: 30px; text-align: center; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px); border: 2px solid var(--gold); border-radius: 20px; }
 .hidden { display: none !important; }
-
-/* 按钮与输入框 */
-.btn-primary {
-    background: var(--gold); color: #000; width: 100%; padding: 18px;
-    border: none; border-radius: 12px; font-size: 20px; font-weight: 900;
-    margin: 15px 0; cursor: pointer;
-}
-
-.btn-side { background: #fff; color: #000; border: none; padding: 0 15px; border-radius: 10px; font-weight: bold; }
-
-input {
-    width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #444;
-    background: #000; color: var(--gold); font-size: 18px; box-sizing: border-box;
-}
-
-input:focus {
-    border-color: var(--gold);
-    box-shadow: 0 0 15px rgba(255, 235, 59, 0.4);
-    outline: none;
-}
-
-/* 二维码中心到边缘位移 */
-.room-info-center { display: flex; flex-direction: column; align-items: center; padding: 40px 0; transition: all 0.8s ease; }
-.room-info-edge { 
-    position: sticky; top: 0; width: 100%; height: 70px;
-    background: rgba(0,0,0,0.6); display: flex; align-items: center; 
-    justify-content: space-between; padding: 0 20px; z-index: 999;
-    backdrop-filter: blur(10px); box-sizing: border-box;
-}
+.btn-primary { background: var(--gold); color: #000; width: 100%; padding: 18px; border: none; border-radius: 12px; font-size: 20px; font-weight: 900; margin: 15px 0; cursor: pointer; }
+input { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #444; background: #000; color: var(--gold); font-size: 18px; box-sizing: border-box; }
+input:focus { border-color: var(--gold); box-shadow: 0 0 15px rgba(255, 235, 59, 0.4); outline: none; }
+.room-info-center { display: flex; flex-direction: column; align-items: center; padding: 40px 0; transition: all 0.8s; }
+.room-info-edge { position: sticky; top: 0; width: 100%; height: 75px; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 999; backdrop-filter: blur(10px); box-sizing: border-box; }
 #qrcode { background: #fff; padding: 5px; border-radius: 5px; }
-.room-info-edge #qrcode { transform: scale(0.35); transform-origin: right; margin: 0; }
+.room-info-edge #qrcode { transform: scale(0.35); transform-origin: right; }
 .big-code { font-size: 48px; font-weight: 900; color: var(--gold); }
-.room-info-edge .big-code { font-size: 20px; }
-
-/* 玩家卡片 */
-.player-grid { padding: 10px; }
-.player-card {
-    background: rgba(255,255,255,0.05); border: 1px solid #444;
-    border-radius: 15px; padding: 15px; margin-bottom: 10px;
-}
-.player-card.me { border: 2px solid var(--gold); background: rgba(255, 235, 59, 0.05); }
-.p-score { font-size: 38px; font-weight: 900; color: #fff; }
-
-.transfer-area { display: none; margin-top: 15px; gap: 10px; }
+.room-info-edge .big-code { font-size: 22px; }
+.player-card { background: rgba(255,255,255,0.05); border: 1px solid #444; border-radius: 15px; padding: 15px; margin: 10px; }
+.p-score { font-size: 42px; font-weight: 900; }
