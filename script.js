@@ -1,84 +1,142 @@
-// 核心：确保只声明一次！
 const supabaseUrl = 'https://iksfgmnvbyldhrrptiwv.supabase.co';
 const supabaseKey = 'sb_publishable_51l5etLAilmVdkptxlx-Wg_BbwqUrhA';
-const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey); // 变量名改掉，防止冲突
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 let currentRoom = "";
 let myName = "";
+let currentPlayers = [];
+let currentHistory = [];
 
-// 关键：将函数挂载到全局，确保 HTML 能点到
+// 90后喜欢的头像库 (Y2K像素风 + 搞怪)
+const y2kAvatars = ['👾', '🐱‍👤', '🌈', '💿', '🎸', '🕹️', '📟', '🛹', '🍹', '🎈'];
+// 甄嬛传缩写/符号头像
+const palaceAvatars = ['👸', '🍵', '📿', '💄', '👑', '🦢', '🧧'];
+
+// 进入战场
 window.joinRoom = async function() {
-    console.log("正在尝试加入战场...");
-    const roomInput = document.getElementById('roomInput');
-    const userInput = document.getElementById('userInput');
-    
-    if (!roomInput || !userInput) return;
-    
-    const room = roomInput.value.trim();
-    const user = userInput.value.trim();
-    
-    if (!room || !user) {
-        alert("请输入房间名和名字！");
-        return;
-    }
+    const room = document.getElementById('roomInput').value.trim();
+    const user = document.getElementById('userInput').value.trim();
+    if (!room || !user) return alert("房间名和名字都要填哦！");
 
     currentRoom = room;
     myName = user;
 
     try {
-        // 1. 尝试获取房间数据
         let { data, error } = await supabaseClient.from('scores').select('*').eq('text', currentRoom);
         if (error) throw error;
 
         let roomData = data[0];
-        let players = [];
-        let history = [];
-
         if (!roomData) {
-            // 2. 没房就建新房
-            players = [{name: myName, score: 0, avatar: '🀄️'}];
-            await supabaseClient.from('scores').insert([{text: currentRoom, player_data: players, history_data: []}]);
+            currentPlayers = [{name: myName, score: 0, avatar: '👾'}];
+            await supabaseClient.from('scores').insert([{text: currentRoom, player_data: currentPlayers, history_data: []}]);
         } else {
-            // 3. 有房就加入
-            players = roomData.player_data || [];
-            history = roomData.history_data || [];
-            if (!players.find(p => p.name === myName)) {
-                players.push({name: myName, score: 0, avatar: '👤'});
-                await supabaseClient.from('scores').update({player_data: players}).eq('text', currentRoom);
+            currentPlayers = roomData.player_data || [];
+            currentHistory = roomData.history_data || [];
+            if (!currentPlayers.find(p => p.name === myName)) {
+                currentPlayers.push({name: myName, score: 0, avatar: '👾'});
+                await supabaseClient.from('scores').update({player_data: currentPlayers}).eq('text', currentRoom);
             }
         }
 
-        // 4. 进入成功，切换 UI
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('roomIdDisplay').innerText = currentRoom;
-        renderUI(players, history);
-        
-        // 开启监听
+        renderUI(currentPlayers, currentHistory);
         subscribeUpdates();
 
     } catch (err) {
-        console.error("连接失败:", err.message);
         alert("连接失败: " + err.message);
     }
 }
 
+// 实时同步渲染
+function renderUI(players, history) {
+    currentPlayers = players;
+    currentHistory = history || [];
+    
+    // 渲染玩家卡片 (界限分明)
+    const grid = document.getElementById('playerGrid');
+    grid.innerHTML = players.map(p => `
+        <div class="player-card ${p.name === myName ? 'me' : ''}">
+            <div class="avatar-circle" onclick="window.changeAvatar('${p.name}')">${p.avatar || '👤'}</div>
+            <div class="info" onclick="window.openTransfer('${p.name}')">
+                <div class="p-name">${p.name}</div>
+                <div class="p-score ${p.score >= 0 ? 'plus' : 'minus'}">${p.score}</div>
+            </div>
+        </div>
+    `).join('');
+
+    // 渲染流水
+    const logList = document.getElementById('logList');
+    logList.innerHTML = currentHistory.slice().reverse().map(h => `
+        <div class="log-item">
+            <span class="t">${h.time}</span> <strong>${h.from}</strong> ➔ <strong>${h.to}</strong> <span class="v">${h.pts}</span>
+        </div>
+    `).join('');
+}
+
+// 记分系统：点击头像以外的区域触发转账
+let targetPlayer = "";
+window.openTransfer = function(name) {
+    if (name === myName) return;
+    targetPlayer = name;
+    document.getElementById('modalTitle').innerText = `向 ${name} 付钱`;
+    document.getElementById('modal').classList.remove('hidden');
+}
+
+window.closeModal = function() { document.getElementById('modal').classList.add('hidden'); }
+
+// 确认转账逻辑
+window.confirmPay = async function() {
+    const pts = parseInt(document.getElementById('scoreInput').value);
+    if (!pts || pts <= 0) return;
+
+    // 防止“平行时空”冲突：更新前先取最新数据
+    let { data } = await supabaseClient.from('scores').select('*').eq('text', currentRoom).single();
+    let players = data.player_data;
+    let history = data.history_data || [];
+
+    players = players.map(p => {
+        if (p.name === myName) p.score -= pts;
+        if (p.name === targetPlayer) p.score += pts;
+        return p;
+    });
+
+    history.push({
+        from: myName, to: targetPlayer, pts: pts,
+        time: new Date().toLocaleTimeString('zh-CN', {hour12:false, hour:'2-digit', minute:'2-digit'})
+    });
+
+    const { error } = await supabaseClient.from('scores').update({player_data: players, history_data: history}).eq('text', currentRoom);
+    if (!error) {
+        // 甄嬛传语音
+        if (document.body.className === 'theme-palace') {
+            const speak = new SpeechSynthesisUtterance(`赏赐${targetPlayer}碎银${pts}两`);
+            window.speechSynthesis.speak(speak);
+        }
+        document.getElementById('scoreInput').value = '';
+        closeModal();
+    }
+}
+
+// 随机换头像逻辑
+window.changeAvatar = async function(name) {
+    if (name !== myName) return; // 只能改自己的
+    const list = document.body.className === 'theme-palace' ? palaceAvatars : y2kAvatars;
+    const nextAvatar = list[Math.floor(Math.random() * list.length)];
+    
+    currentPlayers = currentPlayers.map(p => {
+        if (p.name === myName) p.avatar = nextAvatar;
+        return p;
+    });
+
+    await supabaseClient.from('scores').update({player_data: currentPlayers}).eq('text', currentRoom);
+}
+
 function subscribeUpdates() {
-    supabaseClient.channel('any').on('postgres_changes', 
+    supabaseClient.channel('realtime_room').on('postgres_changes', 
         { event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` }, 
         payload => renderUI(payload.new.player_data, payload.new.history_data)
     ).subscribe();
 }
 
-function renderUI(players, history) {
-    const grid = document.getElementById('playerGrid');
-    grid.innerHTML = players.map(p => `
-        <div class="player-card ${p.name === myName ? 'me' : ''}" onclick="openTransfer('${p.name}')">
-            <div class="avatar-circle">${p.avatar || '👤'}</div>
-            <div class="info">
-                <div class="p-name">${p.name}</div>
-                <div class="p-score">${p.score}</div>
-            </div>
-        </div>
-    `).join('');
-    // ... 其他渲染代码保持原样
-}
+window.changeTheme = function(t) { document.getElementById('mainBody').className = t; }
