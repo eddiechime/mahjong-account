@@ -1,19 +1,20 @@
-:root {
-    --cyber-bg: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    --gold: #ffeb3b;
-}
-body { background: var(--cyber-bg); color: #fff; margin: 0; font-family: sans-serif; min-height: 100vh; }
-.full-screen-mask { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--cyber-bg); z-index: 10000; display: flex; justify-content: center; align-items: center; }
-.glass-box { width: 85%; max-width: 400px; padding: 30px; text-align: center; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px); border: 2px solid var(--gold); border-radius: 20px; }
+:root { --gold: #ffeb3b; --bg: #1a1a2e; }
+body { background: var(--bg); color: #fff; margin: 0; font-family: sans-serif; }
+.full-screen-mask { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; justify-content: center; align-items: center; }
 .hidden { display: none !important; }
-.btn-primary { background: var(--gold); color: #000; width: 100%; padding: 18px; border: none; border-radius: 12px; font-size: 20px; font-weight: 900; margin: 15px 0; cursor: pointer; }
-input { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #444; background: #000; color: var(--gold); font-size: 18px; box-sizing: border-box; }
-input:focus { border-color: var(--gold); box-shadow: 0 0 15px rgba(255, 235, 59, 0.4); outline: none; }
-.room-info-center { display: flex; flex-direction: column; align-items: center; padding: 40px 0; transition: all 0.8s; }
-.room-info-edge { position: sticky; top: 0; width: 100%; height: 75px; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 999; backdrop-filter: blur(10px); box-sizing: border-box; }
-#qrcode { background: #fff; padding: 5px; border-radius: 5px; }
-.room-info-edge #qrcode { transform: scale(0.35); transform-origin: right; }
-.big-code { font-size: 48px; font-weight: 900; color: var(--gold); }
-.room-info-edge .big-code { font-size: 22px; }
-.player-card { background: rgba(255,255,255,0.05); border: 1px solid #444; border-radius: 15px; padding: 15px; margin: 10px; }
-.p-score { font-size: 42px; font-weight: 900; }
+.glass-box { width: 85%; padding: 25px; border: 2px solid var(--gold); border-radius: 20px; text-align: center; }
+
+/* 解决点不动：增大点击区域和 z-index */
+.btn-primary { 
+    background: var(--gold); color: #000; width: 100%; padding: 15px; 
+    border: none; border-radius: 10px; font-weight: 900; font-size: 18px;
+}
+.btn-primary:active { transform: scale(0.95); opacity: 0.8; }
+
+.player-card { background: rgba(255,255,255,0.1); margin: 10px; border-radius: 15px; padding: 15px; }
+.transfer-area { 
+    background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; 
+    margin-top: 10px; border: 1px dashed var(--gold);
+    position: relative; z-index: 1000; /* 确保在顶层 */
+}
+.quick-input { width: 100%; padding: 12px; font-size: 20px; border-radius: 8px; border: none; margin-bottom: 10px; }
