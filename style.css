@@ -1,60 +1,31 @@
-:root {
-    --cyber-bg: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-    --gold: #ffeb3b;
-    --border: rgba(255, 235, 59, 0.5);
+/* --- 赛博输入框增强感知 --- */
+.quick-input {
+    width: 100%; padding: 12px; border-radius: 8px; border: 2px solid #444;
+    background: #000; color: var(--gold); font-size: 20px; font-weight: bold;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none; box-sizing: border-box;
 }
 
-body {
-    background: var(--cyber-bg); color: #fff;
-    margin: 0; font-family: -apple-system, sans-serif;
-    min-height: 100vh;
+/* 输入时：呼吸灯特效，感知极强 */
+.quick-input:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 15px rgba(255, 235, 59, 0.5), inset 0 0 5px rgba(255, 235, 59, 0.2);
+    transform: translateY(-2px); /* 轻微悬浮感 */
 }
 
-/* 遮罩逻辑 */
-.login-mask, .modal-mask {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: var(--cyber-bg); z-index: 10000;
-    display: flex; justify-content: center; align-items: center;
+/* 转账按钮：充能点击效果 */
+.quick-send-btn {
+    height: 48px; padding: 0 20px; background: var(--gold); color: #000;
+    border: none; border-radius: 8px; font-weight: 900; cursor: pointer;
+    transition: 0.2s;
 }
-.modal-mask { background: rgba(0,0,0,0.85); z-index: 10001; }
-.hidden { display: none !important; }
-
-.login-box, .modal-box {
-    width: 85%; max-width: 400px; text-align: center;
-    padding: 30px; border: 2px solid var(--gold); border-radius: 20px;
-    background: rgba(255,255,255,0.05); backdrop-filter: blur(10px);
+.quick-send-btn:active {
+    transform: scale(0.9); /* 点击反馈 */
+    filter: brightness(1.2);
 }
 
-/* 按钮与输入框：高对比度 */
-.btn-primary {
-    background: var(--gold); color: #000; border: none;
-    width: 100%; padding: 18px; font-size: 20px; font-weight: 900;
-    border-radius: 12px; margin: 10px 0; cursor: pointer;
+/* 名字输入框也同步增强 */
+#userInput:focus {
+    border-color: #00f2fe;
+    box-shadow: 0 0 15px rgba(0, 242, 254, 0.5);
 }
-input {
-    width: 100%; padding: 15px; border-radius: 10px; border: 1px solid #666;
-    background: #fff; color: #000; font-size: 18px; box-sizing: border-box;
-}
-
-/* 二维码位移动画 */
-.room-info-center { display: flex; flex-direction: column; align-items: center; padding: 40px 0; transition: all 0.8s ease; }
-.room-info-edge { 
-    display: flex; flex-direction: row; justify-content: space-between; align-items: center;
-    padding: 10px 20px; background: rgba(0,0,0,0.4); border-bottom: 1px solid #444;
-}
-#qrcode { background: #fff; padding: 10px; border-radius: 5px; }
-.room-info-edge #qrcode { transform: scale(0.35); transform-origin: right; }
-.big-code { font-size: 48px; font-weight: 900; color: var(--gold); }
-.room-info-edge .big-code { font-size: 22px; }
-
-/* 玩家卡片 */
-.player-card {
-    background: rgba(255,255,255,0.05); border: 1px solid #444;
-    margin: 15px; border-radius: 15px; padding: 15px;
-}
-.player-card.me { border: 2px solid var(--gold); box-shadow: 0 0 15px rgba(255,235,59,0.2); }
-.avatar-circle { width: 65px; height: 65px; border-radius: 50%; background: #333; display: flex; align-items: center; justify-content: center; font-size: 32px; margin-right: 15px; }
-.p-score { font-size: 40px; font-weight: 900; }
-
-/* 内嵌转账区 */
-.transfer-area { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #444; gap: 10px; }
