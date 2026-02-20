@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="theme-y2k" id="mainBody">
+
     <div id="loginOverlay" class="full-screen-mask">
         <div class="glass-box">
             <h2 class="cyber-title">🀄️ 孝南麻将云账本</h2>
@@ -33,13 +34,17 @@
         <div id="roomInfoContainer" class="room-info-center">
             <div id="roomCodeDisplay" class="big-code">加载中...</div>
             <div id="qrcode"></div>
-            <p id="waitMsg">等待亲戚入场 (<span id="userCount">1</span>/4)</p>
+            <p id="waitMsg">等待亲戚扫码入场 (已加入: <span id="userCount">1</span>/4)</p>
         </div>
+
         <div class="player-grid" id="playerGrid"></div>
+        
         <div class="log-section">
+            <h3 style="color:var(--gold); border-bottom:1px solid #444; padding-bottom:5px;">实时流水</h3>
             <div id="logList"></div>
         </div>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
