@@ -193,3 +193,46 @@ body { background: var(--bg); color: var(--text); }
 /* 分区界限强化 */
 .player-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
 .player-card { border-left: 8px solid var(--border); background: rgba(0,0,0,0.05); }
+/* --- 登录按钮易读性强化 --- */
+.login-box button {
+    width: 100%; padding: 18px; margin-top: 15px;
+    font-size: 24px; font-weight: 900; letter-spacing: 2px;
+    background: #000; color: #fff; /* 高对比度：黑底白字 */
+    border: 3px solid var(--border);
+    box-shadow: 0 0 20px var(--border); /* 呼吸灯特效 */
+    cursor: pointer; position: relative;
+}
+
+.theme-palace .login-box button {
+    background: #5a0000; color: #d4af37; /* 宫廷红底金字 */
+    border: 3px double #d4af37;
+}
+
+/* --- 转账区布局修复 --- */
+.player-card {
+    display: flex; flex-direction: column; /* 改为纵向布局，防止挤压 */
+    padding: 15px; background: rgba(255,255,255,0.1);
+    border: 2px solid var(--border); margin-bottom: 15px;
+    border-radius: 12px;
+}
+
+.card-top { display: flex; align-items: center; width: 100%; }
+
+.transfer-area {
+    display: none; /* 默认隐藏 */
+    width: 100%; margin-top: 15px;
+    padding-top: 15px; border-top: 1px dashed var(--border);
+}
+.transfer-area.active { display: flex; gap: 10px; }
+
+.quick-input {
+    flex: 1; height: 45px; padding: 0 10px;
+    background: #fff; color: #000; border: 2px solid var(--border);
+    font-size: 20px; font-weight: bold;
+}
+
+.quick-send-btn {
+    height: 45px; padding: 0 20px;
+    background: var(--border); color: #000;
+    border: none; font-weight: 900;
+}
