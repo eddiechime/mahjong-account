@@ -1,4 +1,4 @@
-// --- 1. 初始化配置 (变量名唯一化) ---
+// --- 1. 配置：变量名唯一化，防止声明冲突 ---
 const SB_URL = 'https://iksfgmnvbyldhrrptiwv.supabase.co';
 const SB_KEY = 'sb_publishable_51l5etLAilmVdkptxlx-Wg_BbwqUrhA';
 const sbClient = window.supabase.createClient(SB_URL, SB_KEY);
@@ -7,10 +7,10 @@ let currentRoom = "";
 let myName = localStorage.getItem('mahjong_name') || "";
 let currentPlayers = [];
 
-// 100个精选头像库
-const allAvatars = ['👾','🕹️','📟','💿','🌈','🛹','🥤','🍕','🍟','🍔','🐱','🐶','🦊','🦁','🐯','🐼','🐻','🐨','🐰','🐸','👻','💀','👽','🤖','🎃','🦾','🧠','🧶','👓','🎩','🎭','🎨','🎬','🎤','🎧','🎸','🎹','🥁','🎷','🎺','🎳','🎮','🎯','🎲','🎰','🎱','🧩','🧸','🧧','💰','💎','🔮','🧿','🏮','🎴','🧪','🧬','🔭','🛸','🚀','🛰️','🪐','🌌','🌋','🍀','🍄','🌵','🌴','🐉','🐲','🦖','🐢','🐍','🐙','🦑','🦞','🦐','🐚','🍣','🍜','🥟','🍱','🍵','🍺','🍷','🍹','🍦','🍩','🍭','🍓','🥑','🥦','🌶️','🌽',' popcorn','🍡','🥞','🥨'];
+// 100个90后精选头像
+const allAvatars = ['👾','🕹️','📟','💿','🌈','🛹','🥤','🍕','🍟','🍔','🐱','🐶','🦊','🦁','🐯','🐼','🐻','🐨','🐰','🐸','👻','💀','👽','🤖','🎃','🦾','🧠','👓','🎩','🎭','🎨','🎬','🎤','🎧','🎸','🎹','🥁','🎷','🎺','🎳','🎮','🎯','🎲','🎰','🎱','🧩','🧸','🧧','💰','💎','🔮','🧿','🏮','🎴','🧪','🧬','🔭','🛸','🚀','🛰️','🪐','🌌','🌋','🍀','🍄','🌵','🌴','🐉','🐲','🦖','🐢','🐍','🐙','🦑','🦞','🦐','🐚','🍣','🍜','🥟','🍱','🍵','🍺','🍷','🍹','🍦','🍩','🍭','🍓','🥑','🥦','🌶️','🌽','🍿','🍡','🥞','🥨'];
 
-// --- 2. 进场逻辑 (修复报错关键) ---
+// --- 2. 进场与刷新逻辑 (解决刷新回首页痛点) ---
 window.onload = function() {
     const urlParams = new URLSearchParams(window.location.search);
     const roomFromUrl = urlParams.get('room');
@@ -51,7 +51,7 @@ window.saveNameAndStart = function() {
     enterBattle();
 };
 
-// --- 3. 数据库交互 (修复平行时空) ---
+// --- 3. 联机交互 (解决平行时空痛点) ---
 async function enterBattle() {
     try {
         let { data } = await sbClient.from('scores').select('*').eq('text', currentRoom).maybeSingle();
@@ -72,11 +72,11 @@ async function enterBattle() {
 
         renderUI(players, history);
         
-        sbClient.channel('any').on('postgres_changes', 
+        sbClient.channel('updates').on('postgres_changes', 
             { event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` }, 
             payload => { if(payload.new) renderUI(payload.new.player_data, payload.new.history_data); }
         ).subscribe();
-    } catch (e) { alert("连接失败: " + e.message); }
+    } catch (e) { alert("进场失败: " + e.message); }
 }
 
 function renderUI(players, history) {
@@ -88,12 +88,4 @@ function renderUI(players, history) {
     grid.innerHTML = players.map(p => `
         <div class="player-card ${p.name === myName ? 'me' : ''}">
             <div style="display:flex; align-items:center; position:relative; z-index:2" onclick="window.toggleBox('${p.name}')">
-                <div class="avatar-circle" style="width:60px; height:60px; background:#333; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; margin-right:15px;" onclick="event.stopPropagation(); window.changeAvatar('${p.name}')">
-                    ${p.avatar || '👤'}
-                </div>
-                <div style="flex:1">
-                    <div style="font-size:14px; opacity:0.6">${p.name}</div>
-                    <div class="p-score" style="font-size:38px; font-weight:900;">${p.score}</div>
-                </div>
-            </div>
-            <div class="transfer-area" id="box-${p.name}" style="display:none; flex-direction:column; gap:10px; margin-top:1
+                <div class="avatar-circle" style="width:60px; height:
