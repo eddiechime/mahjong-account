@@ -8,14 +8,14 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="theme-y2k" id="mainBody">
     <div id="loginOverlay" class="full-screen-mask">
         <div class="glass-box">
             <h2 class="cyber-title">🀄️ 孝南麻将云账本</h2>
-            <button onclick="window.startNewRoom()" class="btn-primary">开启新局 (自动生成)</button>
+            <button onclick="window.startNewRoom()" class="btn-primary">开启新局 (生成4位号)</button>
             <div class="divider">或</div>
             <div style="display:flex; gap:10px;">
-                <input type="number" id="roomInput" placeholder="4位房号" pattern="[0-9]*" style="flex:1">
+                <input type="number" id="roomInput" placeholder="输入4位房号" pattern="[0-9]*" style="flex:1">
                 <button onclick="window.joinExistingRoom()" class="btn-side">加入</button>
             </div>
         </div>
@@ -35,14 +35,11 @@
             <div id="qrcode"></div>
             <p id="waitMsg">等待亲戚入场 (<span id="userCount">1</span>/4)</p>
         </div>
-
         <div class="player-grid" id="playerGrid"></div>
-        
         <div class="log-section">
             <div id="logList"></div>
         </div>
     </div>
-
     <script src="script.js"></script>
 </body>
 </html>
