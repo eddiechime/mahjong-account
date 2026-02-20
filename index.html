@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>孝南麻将云账本·赛博版</title>
+    <title>孝南麻将云账本·最终版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -11,11 +11,10 @@
 <body id="mainBody">
     <div id="loginOverlay" class="full-screen-mask">
         <div class="glass-box">
-            <h2 class="cyber-title">🀄️ 孝南麻将云账本</h2>
+            <h2>🀄️ 孝南麻将云账本</h2>
             <button onclick="window.startNewRoom()" class="btn-primary">开启新局</button>
-            <div class="divider">或</div>
-            <div style="display:flex; gap:10px;">
-                <input type="number" id="roomInput" placeholder="4位房号" pattern="[0-9]*" style="flex:1">
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <input type="number" id="roomInput" placeholder="输入4位房号" style="flex:1">
                 <button onclick="window.joinExistingRoom()" class="btn-side">加入</button>
             </div>
         </div>
@@ -24,23 +23,23 @@
     <div id="nameModal" class="full-screen-mask hidden">
         <div class="glass-box">
             <h3>阁下大名？</h3>
-            <input type="text" id="userInput" placeholder="输入名字 (如: 思聪)">
+            <input type="text" id="userInput" placeholder="例如：思聪">
             <button onclick="window.saveNameAndStart()" class="btn-primary">步入战场</button>
         </div>
     </div>
 
-    <div class="app-container hidden" id="appMain">
+    <div id="appMain" class="app-container hidden">
         <div id="roomInfoContainer" class="room-info-center">
             <div id="roomCodeDisplay" class="big-code"></div>
             <div id="qrcode"></div>
-            <p id="waitMsg">已加入: <span id="userCount">1</span>/4</p>
+            <p>已加入: <span id="userCount">1</span>/4</p>
         </div>
         <div class="player-grid" id="playerGrid"></div>
         <div class="log-section">
+            <h3 style="color:#ffeb3b">实时账单流水</h3>
             <div id="logList"></div>
         </div>
     </div>
-
     <script src="script.js"></script>
 </body>
 </html>
