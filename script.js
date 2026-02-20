@@ -1,114 +1,106 @@
-// --- 1. 初始化配置 ---
-const SB_URL = 'https://iksfgmnvbyldhrrptiwv.supabase.co';
-const SB_KEY = 'sb_publishable_51l5etLAilmVdkptxlx-Wg_BbwqUrhA';
-const sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+const URL = 'https://iksfgmnvbyldhrrptiwv.supabase.co';
+const KEY = 'sb_publishable_51l5etLAilmVdkptxlx-Wg_BbwqUrhA';
+const db = supabase.createClient(URL, KEY);
 
 let currentRoom = "";
 let myName = localStorage.getItem('mahjong_name') || "";
-let currentPlayers = [];
 
-// --- 2. 自动进房与参数识别 ---
-window.onload = function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomFromUrl = urlParams.get('room');
-    if (roomFromUrl) {
-        currentRoom = roomFromUrl;
-        checkName();
-    }
-};
-
-window.startNewRoom = function() {
+// --- 挂载全局函数，解决“点不动” ---
+window.startNewRoom = () => {
     currentRoom = Math.floor(1000 + Math.random() * 9000).toString();
     window.history.pushState({}, '', `?room=${currentRoom}`);
     checkName();
 };
 
-window.joinExistingRoom = function() {
-    const val = document.getElementById('roomInput').value.trim();
-    if (val.length !== 4) return alert("请输入4位房号");
-    currentRoom = val;
+window.joinExistingRoom = () => {
+    currentRoom = document.getElementById('roomInput').value;
+    if(currentRoom.length !== 4) return alert("房号不对");
     window.history.pushState({}, '', `?room=${currentRoom}`);
     checkName();
 };
 
-function checkName() {
-    if (!myName) document.getElementById('nameModal').classList.remove('hidden');
-    else enterBattle();
-}
-
-window.saveNameAndStart = function() {
+window.saveNameAndStart = () => {
     const val = document.getElementById('userInput').value.trim();
-    if (!val) return alert("请赐名");
+    if(!val) return;
     myName = val;
     localStorage.setItem('mahjong_name', val);
     document.getElementById('nameModal').classList.add('hidden');
     enterBattle();
 };
 
-// --- 3. 核心接入：开启实时频道监听 ---
+function checkName() {
+    if(!myName) document.getElementById('nameModal').classList.remove('hidden');
+    else enterBattle();
+}
+
 async function enterBattle() {
-    try {
-        let { data } = await sbClient.from('scores').select('*').eq('text', currentRoom).maybeSingle();
-        let players = data ? (data.player_data || []) : [];
-        let history = data ? (data.history_data || []) : [];
+    // 1. 获取初始数据
+    let { data } = await db.from('scores').select('*').eq('text', currentRoom).maybeSingle();
+    let players = data ? (data.player_data || []) : [];
+    
+    if (!players.find(p => p.name === myName)) {
+        players.push({ name: myName, score: 0, avatar: '🀄️' });
+        await db.from('scores').upsert({ text: currentRoom, player_data: players, history_data: data?.history_data || [] });
+    }
 
-        if (!players.find(p => p.name === myName)) {
-            players.push({ name: myName, score: 0, avatar: '🀄️' });
-            await sbClient.from('scores').upsert({ text: currentRoom, player_data: players, history_data: history });
-        }
+    document.getElementById('loginOverlay').classList.add('hidden');
+    document.getElementById('appMain').classList.remove('hidden');
+    document.getElementById('roomCodeDisplay').innerText = "房号: " + currentRoom;
+    
+    // 2. 实时监听 (解决平行时空的关键)
+    db.channel(`room-${currentRoom}`).on('postgres_changes', { 
+        event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` 
+    }, payload => {
+        renderUI(payload.new.player_data, payload.new.history_data);
+    }).subscribe();
 
-        document.getElementById('loginOverlay').classList.add('hidden');
-        document.getElementById('appMain').classList.remove('hidden');
-        document.getElementById('roomCodeDisplay').innerText = "房号: " + currentRoom;
-
-        // 生成含参数二维码，方便扫码即入
-        document.getElementById('qrcode').innerHTML = "";
-        new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 140, height: 140 });
-
-        renderUI(players, history);
-        
-        // 【关键】实时监听：只要数据库变了，立刻刷新所有人的屏幕
-        sbClient.channel(`room-${currentRoom}`).on('postgres_changes', 
-            { event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` }, 
-            payload => { if(payload.new) renderUI(payload.new.player_data, payload.new.history_data); }
-        ).subscribe();
-
-    } catch (e) { alert("进场失败: " + e.message); }
+    renderUI(players, data?.history_data || []);
 }
 
 function renderUI(players, history) {
-    currentPlayers = players;
     document.getElementById('userCount').innerText = players.length;
-    document.getElementById('roomInfoContainer').className = (players.length >= 4) ? "room-info-edge" : "room-info-center";
-
     const grid = document.getElementById('playerGrid');
     grid.innerHTML = players.map(p => `
         <div class="player-card ${p.name === myName ? 'me' : ''}">
-            <div style="display:flex; align-items:center" onclick="window.toggleBox('${p.name}')">
-                <div class="avatar-circle" onclick="event.stopPropagation(); window.changeAvatar('${p.name}')">${p.avatar || '👤'}</div>
-                <div style="flex:1">
-                    <div style="font-size:14px; opacity:0.6">${p.name}</div>
-                    <div class="p-score">${p.score}</div>
-                </div>
+            <div class="p-main" onclick="window.toggleBox('${p.name}')">
+                <span class="p-avatar">${p.avatar || '👤'}</span>
+                <span class="p-name">${p.name}</span>
+                <span class="p-score">${p.score}</span>
             </div>
-            <div class="transfer-area" id="box-${p.name}" style="display:none; flex-direction:column; gap:10px; margin-top:15px; border-top:1px dashed #444; padding-top:15px;">
-                <input type="number" id="in-${p.name}" placeholder="金额" inputmode="numeric">
-                <button class="btn-primary" style="margin:0; padding:12px" onclick="window.quickPay('${p.name}')">确认转账</button>
+            <div id="box-${p.name}" class="transfer-area" style="display:none; padding:10px;">
+                <input type="number" id="in-${p.name}" placeholder="金额" class="quick-input">
+                <button onclick="window.doPay('${p.name}')" class="btn-pay">确认转账</button>
             </div>
         </div>
     `).join('');
-
-    document.getElementById('logList').innerHTML = (history || []).slice().reverse().map(h => `
-        <div style="padding:8px; font-size:12px; border-bottom:1px solid #333; color:#ccc">${h.time} | ${h.from} ➔ ${h.to} [${h.pts}]</div>
-    `).join('');
 }
 
-window.toggleBox = function(name) {
-    if (name === myName) return;
-    const box = document.getElementById(`box-${name}`);
-    const isShow = box.style.display === 'flex';
-    document.querySelectorAll('.transfer-area').forEach(b => b.style.display = 'none');
-    box.style.display = isShow ? 'none' : 'flex';
+window.toggleBox = (name) => {
+    if(name === myName) return;
+    const el = document.getElementById(`box-${name}`);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
 };
 
-// --- 4. 【核心修复】转账前强行拉取云
+window.doPay = async (target) => {
+    const val = parseInt(document.getElementById(`in-${target}`).value);
+    if(!val) return;
+
+    // 绝杀：转账前强行重新拉取云端分数，合并平行时空
+    let { data } = await db.from('scores').select('*').eq('text', currentRoom).single();
+    let players = data.player_data.map(p => {
+        if(p.name === myName) p.score -= val;
+        if(p.name === target) p.score += val;
+        return p;
+    });
+    let history = data.history_data || [];
+    history.push({ from: myName, to: target, pts: val, time: new Date().toLocaleTimeString() });
+
+    await db.from('scores').update({ player_data: players, history_data: history }).eq('text', currentRoom);
+    document.getElementById(`box-${target}`).style.display = 'none';
+};
+
+// 自动重连
+if(new URLSearchParams(window.location.search).get('room')) {
+    currentRoom = new URLSearchParams(window.location.search).get('room');
+    checkName();
+}
