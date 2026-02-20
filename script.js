@@ -6,8 +6,9 @@ let currentRoom = "";
 let myName = localStorage.getItem('mahjong_name') || "";
 let currentPlayers = [];
 
-const allAvatars = ['👾','🕹️','📟','💿','🌈','🛹','🥤','🍕','🍟','🍔','🐱','🐶','🦊','🦁','🐯','🐼','🐻','🐨','🐰','🐸','👻','💀','👽','🤖','🎃','🦾','🧠','👓','🎩','🎭','🎨','🎬','🎤','🎧','🎸','🎹','🥁','🎷','🎺','🎳','🎮','🎯','🎲','🎰','🎱','🧩','🧸','🧧','💰','💎','🔮','🧿','🏮','🎴','🧪','🧬','🔭','🛸','🚀','🛰️','🪐','🌌','🌋','🍀','🍄','🌵','🌴','🐉','🐲','Rex','🦖','🐢','🐍','🐙','🦑','🦞','🦐','🐚','🍣','🍜','🥟','🍱','🍵','🍺','🍷','🍹','🍦','🍩','🍭','🍓','🥑','🥦','🌶️','🌽','🍿','🍡','🥞','🥨'];
+const allAvatars = ['👾','🕹️','📟','💿','🌈','🛹','🥤','🍕','🍟','🍔','🐱','🐶','🦊','🦁','🐯','🐼','🐻','🐨','🐰','🐸','👻','💀','👽','🤖','🎃','🦾','🧠','🧶','👓','🎩','🎭','🎨','🎬','🎤','🎧','🎸','🎹','🥁','🎷','🎺','🎳','🎮','🎯','🎲','🎰','🎱','🧩','🧸','🧧','💰','💎','🔮','🧿','🏮','🎴','🧪','🧬','🔭','🛸','🚀','🛰️','🪐','🌌','🌋','🍀','🍄','🌵','🌴','🐉','🐲','🦖','🐢','🐍','🐙','🦑','🦞','🦐','🐚','🍣','🍜','🥟','🍱','🍵','🍺','🍷','🍹','🍦','🍩','🍭','🍓','🥑','🥦','🌶️','🌽','🍡','🥞','🥨'];
 
+// 1. 进房流程
 window.startNewRoom = function() {
     currentRoom = Math.floor(1000 + Math.random() * 9000).toString();
     checkName();
@@ -21,8 +22,11 @@ window.joinExistingRoom = function() {
 };
 
 function checkName() {
-    if (!myName) document.getElementById('nameModal').classList.remove('hidden');
-    else enterBattle();
+    if (!myName) {
+        document.getElementById('nameModal').classList.remove('hidden');
+    } else {
+        enterBattle();
+    }
 }
 
 window.saveNameAndStart = function() {
@@ -34,17 +38,16 @@ window.saveNameAndStart = function() {
     enterBattle();
 };
 
+// 2. 核心接入
 async function enterBattle() {
     try {
-        let { data, error } = await sb.from('scores').select('*').eq('text', currentRoom).maybeSingle();
+        let { data } = await sb.from('scores').select('*').eq('text', currentRoom).maybeSingle();
         
-        // 核心修复：如果 data 为空，手动初始化一个空对象
         let players = data ? (data.player_data || []) : [];
         let history = data ? (data.history_data || []) : [];
 
         if (!players.find(p => p.name === myName)) {
             players.push({ name: myName, score: 0, avatar: '🀄️' });
-            // 使用 upsert 确保新房间创建成功
             await sb.from('scores').upsert({ text: currentRoom, player_data: players, history_data: history });
         }
 
@@ -60,18 +63,15 @@ async function enterBattle() {
 
         renderUI(players, history);
         
-        sb.channel('updates').on('postgres_changes', 
+        sb.channel('any').on('postgres_changes', 
             { event: 'UPDATE', schema: 'public', table: 'scores', filter: `text=eq.${currentRoom}` }, 
-            payload => {
-                if(payload.new) renderUI(payload.new.player_data, payload.new.history_data);
-            }
+            payload => renderUI(payload.new.player_data, payload.new.history_data)
         ).subscribe();
 
     } catch (e) { alert("进场失败: " + e.message); }
 }
 
 function renderUI(players, history) {
-    if(!players) return; // 二重防护
     currentPlayers = players;
     document.getElementById('userCount').innerText = players.length;
     document.getElementById('roomInfoContainer').className = (players.length >= 4) ? "room-info-edge" : "room-info-center";
@@ -80,22 +80,18 @@ function renderUI(players, history) {
     grid.innerHTML = players.map(p => `
         <div class="player-card ${p.name === myName ? 'me' : ''}">
             <div style="display:flex; align-items:center" onclick="window.toggleBox('${p.name}')">
-                <div class="avatar-circle" onclick="event.stopPropagation(); window.changeAvatar('${p.name}')">${p.avatar || '👤'}</div>
+                <div style="width:60px; height:60px; background:#333; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; margin-right:15px;" onclick="event.stopPropagation(); window.changeAvatar('${p.name}')">
+                    ${p.avatar || '👤'}
+                </div>
                 <div style="flex:1">
                     <div style="font-size:14px; opacity:0.6">${p.name}</div>
                     <div class="p-score">${p.score}</div>
                 </div>
             </div>
-            <div class="transfer-area" id="box-${p.name}" style="display:none">
-                <input type="number" class="quick-input" id="in-${p.name}" placeholder="输入积分..." inputmode="numeric">
-                <button class="quick-send-btn" onclick="window.quickPay('${p.name}')">转账</button>
+            <div class="transfer-area" id="box-${p.name}">
+                <input type="number" id="in-${p.name}" placeholder="金额" inputmode="numeric">
+                <button class="btn-side" style="height:50px; width:80px" onclick="window.quickPay('${p.name}')">确定</button>
             </div>
-        </div>
-    `).join('');
-
-    document.getElementById('logList').innerHTML = (history || []).slice().reverse().map(h => `
-        <div style="padding:8px; font-size:13px; border-bottom:1px solid #333; color:#ccc">
-            <span style="color:var(--gold)">${h.time}</span> | ${h.from} ➔ ${h.to} [<b>${h.pts}</b>]
         </div>
     `).join('');
 }
@@ -106,12 +102,10 @@ window.toggleBox = function(name) {
     const isShow = box.style.display === 'flex';
     document.querySelectorAll('.transfer-area').forEach(b => b.style.display = 'none');
     box.style.display = isShow ? 'none' : 'flex';
-    if(!isShow) setTimeout(() => document.getElementById(`in-${name}`).focus(), 100);
 };
 
 window.quickPay = async function(target) {
-    const inputEl = document.getElementById(`in-${target}`);
-    const pts = parseInt(inputEl.value);
+    const pts = parseInt(document.getElementById(`in-${target}`).value);
     if (!pts || pts <= 0) return;
 
     let { data } = await sb.from('scores').select('*').eq('text', currentRoom).single();
@@ -124,7 +118,7 @@ window.quickPay = async function(target) {
     history.push({ from: myName, to: target, pts: pts, time: new Date().toLocaleTimeString('zh-CN', {hour12:false, minute:'2-digit'}) });
 
     await sb.from('scores').update({ player_data: players, history_data: history }).eq('text', currentRoom);
-    inputEl.value = "";
+    document.getElementById(`in-${target}`).value = "";
 };
 
 window.changeAvatar = async function(name) {
